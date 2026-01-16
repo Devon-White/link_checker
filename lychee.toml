@@ -8,8 +8,11 @@ verbose = "warn"
 # 403 included because many sites block automated requests
 accept = [200, 204, 301, 302, 307, 308, 403]
 
-# User agent to avoid bot detection
-user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+# User agent - Use a recent Chrome version to avoid bot detection
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+# Custom headers to appear more browser-like (inline table format)
+header = { "Accept" = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8", "Accept-Language" = "en-US,en;q=0.9", "Cache-Control" = "no-cache" }
 
 # Show progress bar
 no_progress = false
@@ -23,8 +26,11 @@ max_retries = 3
 # Wait time between retries (seconds)
 retry_wait_time = 5
 
-# Maximum concurrent requests
-max_concurrency = 20
+# Maximum concurrent requests - Reduced to avoid rate limiting
+max_concurrency = 10
+
+# Cache duration (1 day)
+max_cache_age = "1d"
 
 # Only check https links
 scheme = ["https", "http"]
@@ -34,30 +40,19 @@ require_https = false
 
 # Exclude patterns (regex)
 exclude = [
-  # Placeholder/example URLs
   "^https://example\\.com",
   "^https://github\\.com/owner/repo",
   "github\\.com/your-org/",
-
-  # Analytics and tracking
   "^https://us\\.i\\.posthog\\.com",
   "^https://c\\.vialoops\\.com",
   "_vercel/(speed-)?insights/",
-
-  # Sites that block automated requests
   "^https://docs\\.stack-auth\\.com",
   "^https://(www\\.)?linkedin\\.com",
   "^https://(www\\.)?twitter\\.com",
   "^https://x\\.com",
   "^https://www\\.npmjs\\.com",
   "^https://cdn\\.simpleicons\\.org",
-
-  # GitHub URLs (verified locally or via separate low-concurrency check)
-  # Note: This blanket exclude is used when excludeGithub=true in the Node script
-  # The script handles GitHub URLs separately to avoid rate limiting
   "^https://github\\.com/",
-
-  # Non-HTTP schemes
   "^mailto:",
   "^tel:",
   "^javascript:",

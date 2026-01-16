@@ -51,6 +51,11 @@ func Fetch(sitemapURL string) ([]string, error) {
 
 // FetchGrouped retrieves and parses a sitemap, returning URLs grouped by source sitemap
 func FetchGrouped(sitemapURL string) (*FetchResult, error) {
+	return FetchGroupedVerbose(sitemapURL, false)
+}
+
+// FetchGroupedVerbose retrieves and parses a sitemap with optional verbose output
+func FetchGroupedVerbose(sitemapURL string, verbose bool) (*FetchResult, error) {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
@@ -85,7 +90,7 @@ func FetchGrouped(sitemapURL string) (*FetchResult, error) {
 	// Try parsing as sitemap index first
 	var sitemapIndex SitemapIndex
 	if err := xml.Unmarshal(body, &sitemapIndex); err == nil && len(sitemapIndex.Sitemaps) > 0 {
-		return fetchSitemapIndexGrouped(client, sitemapIndex)
+		return fetchSitemapIndexGrouped(client, sitemapIndex, verbose)
 	}
 
 	// Parse as regular sitemap
@@ -106,7 +111,7 @@ func FetchGrouped(sitemapURL string) (*FetchResult, error) {
 }
 
 // fetchSitemapIndexGrouped fetches all sitemaps and groups URLs by source
-func fetchSitemapIndexGrouped(client *http.Client, index SitemapIndex) (*FetchResult, error) {
+func fetchSitemapIndexGrouped(client *http.Client, index SitemapIndex, verbose bool) (*FetchResult, error) {
 	result := &FetchResult{
 		Sitemaps: make(map[string][]string),
 	}
@@ -114,23 +119,43 @@ func fetchSitemapIndexGrouped(client *http.Client, index SitemapIndex) (*FetchRe
 	for _, sm := range index.Sitemaps {
 		req, err := http.NewRequest("GET", sm.Loc, nil)
 		if err != nil {
+			if verbose {
+				fmt.Printf("  Skipping %s: failed to create request: %v\n", sm.Loc, err)
+			}
 			continue
 		}
 		req.Header.Set("Accept", "application/xml, text/xml")
 
 		resp, err := client.Do(req)
 		if err != nil {
+			if verbose {
+				fmt.Printf("  Skipping %s: fetch failed: %v\n", sm.Loc, err)
+			}
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			if verbose {
+				fmt.Printf("  Skipping %s: status %d\n", sm.Loc, resp.StatusCode)
+			}
+			resp.Body.Close()
 			continue
 		}
 
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
+			if verbose {
+				fmt.Printf("  Skipping %s: failed to read body: %v\n", sm.Loc, err)
+			}
 			continue
 		}
 
 		var urlSet URLSet
 		if err := xml.Unmarshal(body, &urlSet); err != nil {
+			if verbose {
+				fmt.Printf("  Skipping %s: failed to parse XML: %v\n", sm.Loc, err)
+			}
 			continue
 		}
 

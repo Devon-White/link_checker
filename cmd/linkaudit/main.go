@@ -68,7 +68,7 @@ func run(cmd *cobra.Command, args []string) error {
 	sitemapURL := baseURL
 	fmt.Printf("Fetching sitemap from %s...\n", sitemapURL)
 
-	fetchResult, err := sitemap.FetchGrouped(sitemapURL)
+	fetchResult, err := sitemap.FetchGroupedVerbose(sitemapURL, verbose)
 	if err != nil {
 		return fmt.Errorf("failed to fetch sitemap: %w", err)
 	}
