@@ -30,15 +30,40 @@ type Sitemap struct {
 	Loc string `xml:"loc"`
 }
 
+// FetchResult contains URLs grouped by their source sitemap
+type FetchResult struct {
+	// Sitemaps maps sitemap URL to the page URLs it contains
+	Sitemaps map[string][]string
+	// AllURLs is a flat list of all URLs (for merged mode)
+	AllURLs []string
+}
 
 
-// Fetch retrieves and parses a sitemap, returning all page URLs
+
+// Fetch retrieves and parses a sitemap, returning all page URLs (merged)
 func Fetch(sitemapURL string) ([]string, error) {
+	result, err := FetchGrouped(sitemapURL)
+	if err != nil {
+		return nil, err
+	}
+	return result.AllURLs, nil
+}
+
+// FetchGrouped retrieves and parses a sitemap, returning URLs grouped by source sitemap
+func FetchGrouped(sitemapURL string) (*FetchResult, error) {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
 
-	resp, err := client.Get(sitemapURL)
+	req, err := http.NewRequest("GET", sitemapURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Request XML explicitly to avoid getting HTML rendering
+	req.Header.Set("Accept", "application/xml, text/xml")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch sitemap: %w", err)
 	}
@@ -53,10 +78,14 @@ func Fetch(sitemapURL string) ([]string, error) {
 		return nil, fmt.Errorf("failed to read sitemap body: %w", err)
 	}
 
+	result := &FetchResult{
+		Sitemaps: make(map[string][]string),
+	}
+
 	// Try parsing as sitemap index first
 	var sitemapIndex SitemapIndex
 	if err := xml.Unmarshal(body, &sitemapIndex); err == nil && len(sitemapIndex.Sitemaps) > 0 {
-		return fetchSitemapIndex(client, sitemapIndex)
+		return fetchSitemapIndexGrouped(client, sitemapIndex)
 	}
 
 	// Parse as regular sitemap
@@ -70,7 +99,52 @@ func Fetch(sitemapURL string) ([]string, error) {
 		urls = append(urls, u.Loc)
 	}
 
-	return dedupe(urls), nil
+	result.Sitemaps[sitemapURL] = urls
+	result.AllURLs = dedupe(urls)
+
+	return result, nil
+}
+
+// fetchSitemapIndexGrouped fetches all sitemaps and groups URLs by source
+func fetchSitemapIndexGrouped(client *http.Client, index SitemapIndex) (*FetchResult, error) {
+	result := &FetchResult{
+		Sitemaps: make(map[string][]string),
+	}
+
+	for _, sm := range index.Sitemaps {
+		req, err := http.NewRequest("GET", sm.Loc, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Accept", "application/xml, text/xml")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			continue
+		}
+
+		var urlSet URLSet
+		if err := xml.Unmarshal(body, &urlSet); err != nil {
+			continue
+		}
+
+		urls := make([]string, 0, len(urlSet.URLs))
+		for _, u := range urlSet.URLs {
+			urls = append(urls, u.Loc)
+		}
+
+		result.Sitemaps[sm.Loc] = urls
+		result.AllURLs = append(result.AllURLs, urls...)
+	}
+
+	result.AllURLs = dedupe(result.AllURLs)
+	return result, nil
 }
 
 // fetchSitemapIndex fetches all sitemaps from a sitemap index
@@ -78,7 +152,13 @@ func fetchSitemapIndex(client *http.Client, index SitemapIndex) ([]string, error
 	var allURLs []string
 
 	for _, sm := range index.Sitemaps {
-		resp, err := client.Get(sm.Loc)
+		req, err := http.NewRequest("GET", sm.Loc, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Accept", "application/xml, text/xml")
+
+		resp, err := client.Do(req)
 		if err != nil {
 			continue // Skip failed sitemaps
 		}
