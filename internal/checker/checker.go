@@ -21,19 +21,40 @@ type Options struct {
 	Verbose     bool
 }
 
+// LinkStatus represents the status of a checked link
+type LinkStatus struct {
+	URL       string `json:"url"`
+	Status    string `json:"status"`
+	Code      int    `json:"code,omitempty"`
+	SourceURL string `json:"source_url"`
+}
+
 // Result contains the check results
 type Result struct {
-	PassedCount   int
-	FailedCount   int
-	ExcludedCount int
+	PassedCount   int          `json:"passed_count"`
+	FailedCount   int          `json:"failed_count"`
+	ExcludedCount int          `json:"excluded_count"`
+	Links         []LinkStatus `json:"links"`
+}
+
+// LycheeLink represents a single link in lychee output
+type LycheeLink struct {
+	URL    string `json:"url"`
+	Status struct {
+		Text string `json:"text"`
+		Code int    `json:"code"`
+	} `json:"status"`
 }
 
 // LycheeOutput represents the JSON output from lychee
 type LycheeOutput struct {
-	Total      int `json:"total"`
-	Successful int `json:"successful"`
-	Errors     int `json:"errors"`
-	Excludes   int `json:"excludes"`
+	Total       int                       `json:"total"`
+	Successful  int                       `json:"successful"`
+	Errors      int                       `json:"errors"`
+	Excludes    int                       `json:"excludes"`
+	SuccessMap  map[string][]LycheeLink   `json:"success_map"`
+	ErrorMap    map[string][]LycheeLink   `json:"error_map"`
+	ExcludedMap map[string][]LycheeLink   `json:"excluded_map"`
 }
 
 // CheckURLs runs lychee to check all links on the given page URLs
@@ -116,6 +137,39 @@ func CheckURLs(pageURLs []string, opts Options) (*Result, error) {
 	result.PassedCount = output.Successful
 	result.FailedCount = output.Errors
 	result.ExcludedCount = output.Excludes
+
+	// Collect all links with their status and source
+	for sourceURL, links := range output.SuccessMap {
+		for _, link := range links {
+			result.Links = append(result.Links, LinkStatus{
+				URL:       link.URL,
+				Status:    link.Status.Text,
+				Code:      link.Status.Code,
+				SourceURL: sourceURL,
+			})
+		}
+	}
+
+	for sourceURL, links := range output.ErrorMap {
+		for _, link := range links {
+			result.Links = append(result.Links, LinkStatus{
+				URL:       link.URL,
+				Status:    link.Status.Text,
+				Code:      link.Status.Code,
+				SourceURL: sourceURL,
+			})
+		}
+	}
+
+	for sourceURL, links := range output.ExcludedMap {
+		for _, link := range links {
+			result.Links = append(result.Links, LinkStatus{
+				URL:       link.URL,
+				Status:    "excluded",
+				SourceURL: sourceURL,
+			})
+		}
+	}
 
 	// If user requested output to file, copy it or reformat
 	if opts.OutputFile != "" {
