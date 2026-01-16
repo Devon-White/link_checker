@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Devon-White/linkaudit/internal/checker"
-	"github.com/Devon-White/linkaudit/internal/sitemap"
+	"github.com/Devon-White/link_checker/internal/checker"
+	"github.com/Devon-White/link_checker/internal/sitemap"
 	"github.com/spf13/cobra"
 )
 

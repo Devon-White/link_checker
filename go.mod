@@ -1,4 +1,4 @@
-module github.com/Devon-White/linkaudit
+module github.com/Devon-White/link_checker
 
 go 1.21
 

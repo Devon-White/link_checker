@@ -32,7 +32,7 @@ cargo install lychee
 ### Install linkaudit
 
 ```bash
-go install github.com/Devon-White/linkaudit/cmd/linkaudit@latest
+go install github.com/Devon-White/link_checker/cmd/linkaudit@latest
 ```
 
 ## Usage
